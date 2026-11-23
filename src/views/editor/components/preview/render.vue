@@ -3,12 +3,14 @@ import TabBar from '../tabbar/tabbar.vue'
 import { useRenderHTML, useResumeType } from '../../hook'
 import { useThemeConfig } from '@/common/global'
 import { step, pageSize } from '../tabbar/hook'
+import useEditorStore from '@/store/modules/editor'
 
 defineEmits(['upload-avatar', 'html-convert'])
 
 const { resumeType } = useResumeType()
 const { isDark } = useThemeConfig()
 const { renderDOM } = useRenderHTML(resumeType)
+const editorStore = useEditorStore()
 </script>
 
 <template>
@@ -17,16 +19,18 @@ const { renderDOM } = useRenderHTML(resumeType)
       @html-convert="cnt => $emit('html-convert', cnt)"
       @upload-avatar="path => $emit('upload-avatar', path)"
     />
-    <div ref="renderDOM" class="markdown-transform-html jufe reference-dom"></div>
-    <!-- 分页渲染区域 -->
-    <div
-      class="re-render"
-      :style="{
-        transform: `translateY(-${((100 - step) / 100) * 1123 * (pageSize / 2)}px) scale(${
-          step / 100
-        })`
-      }"
-    ></div>
+    <div :data-resume-scope="editorStore.appearanceScope">
+      <div ref="renderDOM" class="markdown-transform-html jufe reference-dom"></div>
+      <!-- 分页渲染区域 -->
+      <div
+        class="re-render"
+        :style="{
+          transform: `translateY(-${((100 - step) / 100) * 1123 * (pageSize / 2)}px) scale(${
+            step / 100
+          })`
+        }"
+      ></div>
+    </div>
   </div>
 </template>
 

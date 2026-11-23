@@ -360,11 +360,11 @@ export function markdownModeInsertOrderedList() {
 
 export function markdownModeInsertLink() {
   const range = getCurrentRanger()
-  range?.insertNode(createText(`[示例文字](https://github.com/acmenlei)`))
+  range?.insertNode(createText(`[示例文字](https://example.com)`))
 }
 export function markdownModeInsertAvatar() {
   const range = getCurrentRanger()
-  range?.insertNode(createText(`![个人头像](https://codeleilei.gitee.io/blog/avatar.jpg)`))
+  range?.insertNode(createText(`![个人头像](/avatar-placeholder.svg)`))
 }
 export function markdownModeInsertIcon(iconName: string) {
   selectIcon.value = false

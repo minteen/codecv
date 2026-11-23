@@ -1,0 +1,12 @@
+{
+  "name": "codecv-pdf-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.18.1"
+  }
+}

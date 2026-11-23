@@ -13,22 +13,45 @@ import {
   useCustomCSS,
   usePrimaryColor,
   useAdjust,
-  useFollowRoll,
-  restResumeContent
+  useFollowRoll
 } from './hook'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useThemeConfig } from '@/common/global'
 import { useResumeType } from '../../hook'
+import { useDraftAppearance } from '@/common/draftAppearance'
+import useEditorStore, { getCurrentTypeContent } from '@/store/modules/editor'
+import { appearanceKeys } from '@/common/appearance'
 
 const emits = defineEmits(['upload-avatar', 'html-convert'])
 
 const { resumeType } = useResumeType()
-const { cssDialog, cssText, toggleDialog, setStyle, removeStyle } = useCustomCSS(resumeType.value)
-const { color, setColor } = usePrimaryColor(resumeType.value)
-const { fontOptions, font, setFont } = useCustomFont(resumeType.value)
+const appearance = useDraftAppearance(resumeType.value)
+const editorStore = useEditorStore()
+async function resetResume() {
+  if (!appearance.active()) return
+  const session = editorStore.draftSession
+  const template = resumeType.value
+  await editorStore.setMDContent(getCurrentTypeContent(template), template, session)
+  if (!appearance.active()) return
+  for (const key of appearanceKeys) {
+    if (!appearance.active()) return
+    await editorStore.setAppearance(key, undefined, template, session)
+  }
+  if (!appearance.active()) return
+  location.reload()
+}
+const { cssDialog, cssText, toggleDialog, setStyle, removeStyle } = useCustomCSS(
+  resumeType.value,
+  appearance
+)
+const { color, setColor } = usePrimaryColor(resumeType.value, appearance)
+const { fontOptions, font, setFont } = useCustomFont(resumeType.value, appearance)
 const { setAvatar } = useAvatar(emits)
-const { primaryColor, setPrimaryColor } = usePrimaryBGColor(resumeType.value)
-const { adjustMargin, visible, confirmAdjustment, properties } = useAdjust(resumeType.value)
+const { primaryColor, setPrimaryColor } = usePrimaryBGColor(resumeType.value, appearance)
+const { adjustMargin, visible, confirmAdjustment, properties } = useAdjust(
+  resumeType.value,
+  appearance
+)
 const { followRoll, setFollowRoll } = useFollowRoll()
 const { isDark } = useThemeConfig()
 </script>
@@ -67,11 +90,12 @@ const { isDark } = useThemeConfig()
         <el-color-picker @change="setPrimaryColor" size="small" v-model="primaryColor" />
       </div>
       <el-popconfirm
+        v-if="!editorStore.activeTemplateId"
         width="240"
         confirm-button-text="是的"
         cancel-button-text="点错了"
         title="你想重置简历的所有内容吗？"
-        @confirm="restResumeContent(resumeType)"
+        @confirm="resetResume"
       >
         <template #reference>
           <i class="operator-item iconfont icon-refresh ml-20"></i>

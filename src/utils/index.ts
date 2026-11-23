@@ -3,9 +3,15 @@ import 'element-plus/es/components/loading/style/css'
 
 export const wOpen = window.open
 
+const templateStyles = import.meta.glob<string>('../templates/modules/*/style.scss', {
+  query: '?inline',
+  import: 'default'
+})
+
 export async function importCSS(name: string) {
-  const res = await import(`../templates/modules/${name}/style.scss`)
-  return res.default
+  const load = templateStyles[`../templates/modules/${name}/style.scss`]
+  if (!load) throw new Error(`找不到模板样式：${name}`)
+  return load()
 }
 
 export function download(url: string, fileName: string) {

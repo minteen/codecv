@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Codemirror } from 'vue-codemirror'
 import { markdownLanguage } from '@codemirror/lang-markdown'
+import { EditorView } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useResumeType } from '../../../hook'
 import useEditorStore from '@/store/modules/editor'
@@ -13,12 +14,13 @@ defineProps<{ left: number }>()
 const { isDark } = useThemeConfig()
 const { resumeType } = useResumeType()
 const editorStore = useEditorStore()
+const session = editorStore.draftSession
 </script>
 
 <template>
   <markdown-toolbar @toggle-editor-mode="editorStore.setWritableMode" />
   <codemirror
-    v-model="editorStore.MDContent"
+    :model-value="editorStore.MDContent"
     :style="{
       height: 'calc(100vh - 40px)',
       borderLeft: isDark ? 'none' : '1px solid #ddd',
@@ -30,8 +32,12 @@ const editorStore = useEditorStore()
     }"
     :autofocus="true"
     :indent-with-tab="true"
-    :extensions="isDark ? [markdownLanguage, oneDark] : [markdownLanguage]"
-    @change="(nv: string) => editorStore.setMDContent(nv, resumeType)"
+    :extensions="
+      isDark
+        ? [markdownLanguage, EditorView.lineWrapping, oneDark]
+        : [markdownLanguage, EditorView.lineWrapping]
+    "
+    @change="(nv: string) => editorStore.setMDContent(nv, resumeType, session)"
   />
 </template>
 

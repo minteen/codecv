@@ -16,15 +16,17 @@ const { DOMTree, ObserverContent, editorStore } = useToggleEditorMode(resumeType
     @toggle-editor-mode="editorStore.setWritableMode"
     @content-change="ObserverContent"
   />
-  <div
-    ref="DOMTree"
-    @click="checkMouseSelect"
-    @input="ObserverContent"
-    class="writable-edit-mode"
-    contenteditable
-    spellcheck="false"
-    :style="{ height: 'calc(100vh - 40px)', width: `${left}px`, overflowY: 'scroll' }"
-  ></div>
+  <div :data-resume-scope="editorStore.appearanceScope">
+    <div
+      ref="DOMTree"
+      @click="checkMouseSelect"
+      @input="ObserverContent"
+      class="writable-edit-mode"
+      contenteditable
+      spellcheck="false"
+      :style="{ height: 'calc(100vh - 40px)', width: `${left}px`, overflowY: 'scroll' }"
+    ></div>
+  </div>
 </template>
 
 <style lang="scss" scoped>

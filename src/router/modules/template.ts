@@ -1,13 +1,13 @@
 import Layout from '@/layout/main.vue'
 
 export default {
-  name: 'template',
   path: '/template',
   component: Layout,
   children: [
     {
-      path: '/template',
+      path: '',
       name: 'template',
+      meta: { workspace: true },
       component: () => import('@/views/template/template.vue')
     }
   ]

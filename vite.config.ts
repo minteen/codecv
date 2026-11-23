@@ -7,52 +7,20 @@ import { defineConfig, loadEnv } from 'vite'
 import viteCompression from 'vite-plugin-compression'
 import eslint from 'vite-plugin-eslint'
 import { visualizer } from 'rollup-plugin-visualizer'
-// import externalGlobals from 'rollup-plugin-external-globals'
-import viteImagemin from 'vite-plugin-imagemin'
-
-// const globals = externalGlobals({
-// jspdf: 'jspdf.jsPDF',
-// axios: 'axios'
-// html2canvas: 'html2canvas'
-// })
+import { draftFilePlugin } from './build/draftFilePlugin'
+import { templateFilePlugin } from './build/templateFilePlugin'
 
 const viteCompressionPlugin = viteCompression({
   disable: false,
   threshold: 10240 // 如果体积大于阈值，将被压缩，单位为b，体积过小时请不要压缩，以免适得其反
 })
 
-const viteImageminPlugin = viteImagemin({
-  gifsicle: {
-    optimizationLevel: 7,
-    interlaced: false
-  },
-  optipng: {
-    optimizationLevel: 7
-  },
-  mozjpeg: {
-    quality: 20
-  },
-  pngquant: {
-    quality: [0.8, 0.9],
-    speed: 4
-  },
-  svgo: {
-    plugins: [
-      {
-        name: 'removeViewBox'
-      },
-      {
-        name: 'removeEmptyAttrs',
-        active: false
-      }
-    ]
-  }
-})
-
 export default ({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   return defineConfig({
     plugins: [
+      draftFilePlugin(process.cwd()),
+      templateFilePlugin(process.cwd()),
       vue(),
       AutoImport({
         resolvers: [ElementPlusResolver()]
@@ -64,22 +32,45 @@ export default ({ mode }) => {
     ],
     resolve: {
       alias: {
-        '@': resolve(__dirname, 'src'),
-        '@@types': resolve(__dirname, 'types')
+        '@': resolve(__dirname, 'src')
       }
     },
     esbuild: {
       drop: env?.VITE_DROP_CONSOLE === 'true' ? ['console', 'debugger'] : []
     },
     base: './',
+    server: {
+      host: '127.0.0.1',
+      cors: { origin: /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/ },
+      fs: {
+        deny: [
+          '.env',
+          '.env.*',
+          '*.{crt,pem,key}',
+          '**/.git/**',
+          '**/drafts/**',
+          '**/template-library/**',
+          '**/local-private/**',
+          '**/tmp/**',
+          '**/output/**'
+        ]
+      },
+      proxy: {
+        '/api/export': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+          configure(proxy) {
+            proxy.on('proxyReq', request => request.removeHeader('origin'))
+          }
+        }
+      }
+    },
+    preview: { host: '127.0.0.1' },
     build: {
       rollupOptions: {
-        // external: ['jspdf', 'axios', 'html2canvas'],
-        // external: ['axios'],
         plugins: [
-          /* globals,  */ viteCompressionPlugin,
-          viteImageminPlugin,
-          visualizer({ open: true })
+          viteCompressionPlugin,
+          ...(env.VITE_ANALYZE === 'true' ? [visualizer({ open: false })] : [])
         ],
         output: {
           chunkFileNames: 'js/[name]-[hash].js',

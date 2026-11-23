@@ -1,11 +1,5 @@
-import useUserStore from '@/store/modules/user'
 import { useDark, useToggle } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
-
-export function isLogin() {
-  const { loginState } = useUserStore()
-  return loginState.logined
-}
 
 export function useThemeConfig() {
   const isDark = useDark()

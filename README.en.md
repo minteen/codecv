@@ -1,90 +1,104 @@
-# codecv
+# CodeCV · Resume Workspace
 
-This is a tool for creating resumes using `markdown`. It can convert your written `markdown` resume into a `PDF` format, supports multiple templates, and runs on love.
+A local-first resume editor with Markdown / content editing, independent resume drafts, editable template management, and a local Chromium PDF service.
 
-<div style="font-size: 1.5rem;">
-  <a href="./README.md">中文</a> |
-  <a href="./README.en.md">English</a>
-</div>
-</br>
+[中文说明](./README.md) · [This fork](https://github.com/minteen/codecv) · [Upstream](https://github.com/acmenlei/codecv) · [License](./LICENSE)
 
-[Online 1](https://codecv.top) [Online 2](https://codeleilei.gitee.io/markdown2pdf)
+Based on CodeCV by coderlei. Required attribution is retained; donation buttons, payment codes, personal contacts, promotional notices, export counters, and retired community/upload integrations have been removed. Bundled resumes and thumbnails use fictional example data.
 
-> Declaration: This project is published on GitHub/Gitee, free and as an open source learning use, use spare time for continuous development, deployment please indicate the original author and the original warehouse address in a prominent place on the website, do not use for commercial purposes without the author's permission!
+## What this fork adds
 
-## 😄 Docker deploy
+- Shared navigation: **My resumes / Template library / Syntax guide**.
+- Independent drafts with create, edit, copy, rename, delete, search, and sorting.
+- Per-resume margins, fonts, colors, and custom CSS, with scoped styles and navigation cleanup.
+- Template creation, editing, explicit saving, deletion, and unsaved-change protection. Clicking a template edits it; a separate action creates a resume.
+- Resume creation copies the template's content and appearance. Later template edits or deletion do not alter existing resumes.
+- Persistent deletion markers prevent bundled templates or stale offline copies from reappearing after refresh.
+- A local `pdf-service/` for PDF and PNG export, using installed Chromium instead of a paid third-party export endpoint.
+- A4, landscape A4, Letter, or custom page dimensions in millimeters (50–2000 mm).
+- Automatic page extension that preserves width and font size while fitting slightly overflowing content on one page.
+- Shared print snapshots with embedded fonts and avatars for consistent direct export and browser printing.
 
-You can directly run using the image I have already built.
+## Quick start
+
+Requires **Node.js 22.12+**, npm, and Chrome / Edge / Chromium for direct PDF export.
 
 ```sh
-docker run -d -t -p 8080:80 --name codecv --restart=always docker.io/wenyang0/codecv:latest
+git clone https://github.com/minteen/codecv.git
+cd codecv
+npm ci
+npm run pdf:install
 ```
 
-Or, you can manually compile it yourself if you prefer.
+Run in separate terminals:
 
 ```sh
-#clone the code
-git clone https://github.com/acmenlei/codecv.git
-
-#docker build
-cd codecv/
-docker build -t codecv:v1 .
-
-#start server
-docker run -d -t -p 8080:80 --name codecv --restart=always codecv:v1
+npm run dev
 ```
 
-Finally, open your browser and access the service's address at http://serverIP:8080
+```sh
+npm run pdf:start
+```
 
-## 🤩 Preview of the result
+Open [the workspace](http://127.0.0.1:5173/#/). Use the actual address printed by Vite if port 5173 is occupied. The frontend binds to `127.0.0.1`; `/api/export` is proxied to the PDF service on port 3001.
 
-<p>Resume template</p>
+Editing and browser print-to-PDF work without the PDF service. See [PDF service documentation](./pdf-service/README.md) for `CHROME_PATH`, `PORT`, `ASSET_ORIGINS`, API details, and service tests. Linux hosts should have suitable CJK fonts installed.
 
-<img style="max-width: 1000px" src="./docs/templates.webp" alt="模板" />
+## Working with templates and resumes
 
-<p>Resume editing and dark themes</p>
+Open a template card to edit the template's name, Markdown, margins, colors, font, and CSS. Click **Save template** to persist changes. **Add template** starts a new blank template. **Delete template** requires confirmation and leaves existing resumes intact.
 
-<img style="max-width: 1000px" src="./docs/editor.webp" alt="编辑页" />
+Use the separate **Create resume from this template** button to create a draft. Draft edits save automatically. Copies inherit the current content and appearance and then evolve independently.
 
-<p>Built-in multiple vector ICONS</p>
+For PDF export, choose a preset or enter the width and height. Enable **Automatically extend the page** to fit content without shrinking the font. Short content retains the specified height; extended pages are limited to 2000 mm. A nonstandard long page may need scaling when printed on A4.
 
-<img style="max-width: 1000px" src="./docs/iconfont.webp" alt="矢量图标" />
+For comparable browser-print output, use the same page size, no margins, 100% scale, background graphics enabled, and headers/footers disabled.
 
-## ✊🏻 Features to be implemented
+## Data and privacy
 
-[✓] Mobile device adaptation
+- Development mode stores drafts in `drafts/<id>.json` and template overrides/deletion markers in `template-library/<type>.json`, falling back to browser storage if the API is unavailable.
+- Pure static hosting uses browser storage. Storage is isolated by scheme, hostname, and port. Clearing browser data removes browser-only records.
+- Drafts, template overrides, private media, build output, test output, and local environment files are excluded by `.gitignore`.
+- Export output is downloaded by the browser; the PDF service does not store uploaded resumes or generated files.
+- Defaults keep resume data on the browser/local machine. Google Fonts and the icon CDN are still external asset dependencies; fully offline use requires self-hosted assets.
+- `VITE_EXPORT_URL` can override the export endpoint. Configuring a remote service sends resumes to that service. All `VITE_*` variables are public, so never place secrets in them.
+- `.gitignore` does not sanitize files already tracked or historical commits. Inspect staged content before publishing, and back up important drafts separately.
 
-[✓] Improved content mode experience
+Copy `.env.example` to `.env.local` only if you need optional configuration; default local startup needs no credentials.
 
-[✓] Template design (continuously updating... contributions to the repository templates are welcome)
+## Validation and builds
 
-## 🤔 Common issues
+```sh
+npm run check
+npm test
+npm run pdf:test
+npm run build
+npm run preview
+```
 
-[Please refer to the user guide for grammar-related questions.](https://codeleilei.gitee.io/markdown2pdf/#/syntax/helper)
+`npm test` runs regression tests only; it never commits or pushes. PDF tests require local Chromium and write ignored output under `tmp/pdfs/`. Frontend and PDF service use separate npm lockfiles.
 
-**Q**: Why export `PDF` after garbled code?
+The Dockerfile serves an existing `dist/` build:
 
-**A**: It may be that the old font is cached, please click the reset resume content in the toolbar at the top of the preview to reset, of course, please ensure that you have saved the content before resetting.
+```sh
+npm run build
+docker build -t codecv-local .
+docker run --rm -p 8080:80 codecv-local
+```
 
-**Q**: Why does the export fail?
+Static deployment does **not** include the Vite draft/template APIs or the PDF service. Run the PDF service separately and reverse-proxy same-origin `/api/export` to `127.0.0.1:3001/api/export`, removing the forwarded `Origin` header. These services target trusted local use; public deployments need authentication, rate limits, resource allowlists, and isolation. `npm run preview` is only a static preview and has no development API proxy.
 
-**A**: At present, the service is deployed on the `Netlify Serverless` service, because it is a foreign server, access is easy to error, please try several times, of course, you can also use the local export `PDF` replacement.
+The inherited dependency stack should be upgraded and tested separately. Check it with `npm audit` and `npm --prefix pdf-service audit`. Non-forced fixes were applied during this preparation, but the frontend still reports **7 findings (1 high, 6 moderate)** associated mainly with the old Vite/type-checking toolchain. Passing checks and builds does not resolve those findings; major upgrades remain follow-up work.
 
-## 🙏 Sponsor
+## Troubleshooting
 
-If you think this project is helpful to you and circumstances permit, you can give me a little support. In short, thank you very much for your support ~
+- **Cannot open the page:** keep the development terminal running and use its actual `127.0.0.1` URL. `/#/home` redirects to `/#/`.
+- **Port 3001 already in use:** a PDF service may already be running. Inspect with `lsof -nP -iTCP:3001 -sTCP:LISTEN` and stop the original process with `Ctrl+C` if a restart is needed.
+- **PDF export fails:** check the PDF service, browser executable, and readable fonts/images; browser print is an alternative.
+- **Missing drafts after switching ports:** browser storage is origin-specific. For development file storage, check the project directory and `drafts/` backup. Resetting content is not a recovery method.
 
-<div style="display: flex; gap: 20px;">
-	<div style="text-align: center">
-		<p>WeChat</p>
-		<img style="width: 165px" src="./docs/wechat.jpg" alt="WeChat" />
-	</div>
-	<div style="text-align: center">
-		<p>Alipay</p>
-		<img style="width: 150px" src="./docs/alipay.jpg" alt="Alipay" />
-	</div>
-</div>
+## Attribution and license
 
-## License
+Original work: coderlei, [acmenlei/codecv](https://github.com/acmenlei/codecv). Fork: [minteen/codecv](https://github.com/minteen/codecv).
 
-MIT © [Coderlei](./license)
+The upstream [LICENSE](./LICENSE) is retained without relicensing. It contains a GPLv3 heading together with noncommercial and attribution clauses; the old README's MIT label did not match it. This fork therefore does not claim an MIT license. Refer to the included license text for its terms.

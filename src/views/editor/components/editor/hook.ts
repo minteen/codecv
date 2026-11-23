@@ -1,14 +1,13 @@
 import useEditorStore from '@/store/modules/editor'
-import { Ref, computed, nextTick, onActivated, onDeactivated, ref, watchEffect } from 'vue'
+import { Ref, computed, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import { linkFlag, selectIcon } from './toolbar/hook'
 import { clickedTarget } from '../../hook'
 import { setClickedLinkText, setClickedLinkURL } from './toolbar/components/linkInput/hook'
 import { getPickerFile } from '@/utils/uploader'
 import { queryDOM } from '@/utils'
 
-export function reactiveWritable(resumeType: string) {
+export function reactiveWritable() {
   const editorStore = useEditorStore()
-  editorStore.initMDContent(resumeType)
   const writable = computed(() => editorStore.writable)
   return {
     writable
@@ -35,12 +34,12 @@ export function useMoveLayout() {
     flag = false
   }
 
-  onActivated(() => {
+  onMounted(() => {
     window.addEventListener('mouseup', up)
     window.addEventListener('mousemove', move)
   })
 
-  onDeactivated(() => {
+  onUnmounted(() => {
     window.removeEventListener('mouseup', up)
     window.removeEventListener('mousemove', move)
   })

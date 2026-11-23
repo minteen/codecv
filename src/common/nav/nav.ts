@@ -5,13 +5,13 @@ const nav = [
     children: ['导入MD', '导出MD', '导出图片']
   },
   {
-    name: '简历模板',
+    name: '新建简历',
     path: '/template',
     tooltip: false
   },
 
   {
-    name: '语法助手',
+    name: '语法解析',
     path: '/syntax/helper',
     tooltip: false
   }

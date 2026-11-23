@@ -7,8 +7,8 @@ import { reactiveWritable, useMoveLayout, injectWritableModeAvatarEvent } from '
 const { resumeType } = useResumeType()
 const { left, down } = useMoveLayout()
 
-const { setAvatar } = useAvatar(resumeType.value)
-const { writable } = reactiveWritable(resumeType.value)
+const { setAvatar } = useAvatar(resumeType)
+const { writable } = reactiveWritable()
 
 injectWritableModeAvatarEvent(writable, setAvatar)
 </script>

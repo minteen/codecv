@@ -1,111 +1,168 @@
-# codecv
+# CodeCV · 简历工作台
 
-这是一款制作简历的工具，它可以将你编写的 `markdown` 简历转为 `PDF`，海量模板。
+一个以本地数据为中心的简历编辑工具，支持 Markdown / 内容模式、独立简历草稿、模板管理，以及本机 Chromium PDF 导出。
 
-<div style="font-size: 1.5rem;">
-  <a href="./README.md">中文</a> |
-  <a href="./README.en.md">English</a>
-</div>
-</br>
+[English](./README.en.md) · [当前仓库](https://github.com/minteen/codecv) · [上游项目](https://github.com/acmenlei/codecv) · [许可证](./LICENSE)
 
-[线上地址 1](https://codecv.top) [线上地址 2](https://codeleilei.gitee.io/markdown2pdf)
+本仓库基于 coderlei 的 CodeCV 修改。界面保留必要的原作署名，已移除打赏、收款码、个人联系方式、引流公告、导出计数和旧社区服务。内置简历均为虚构示例；姓名、经历、学校及联系方式请自行替换。
 
-> 声明：此项目发布于 GitHub/Gitee，免费且作为开源学习使用，使用业余时间进行持续开发，部署请在网站显眼位置注明原作者及原仓库地址，未经作者允许请勿用于商业用途！
+## 本 fork 新增与改进
 
-## 😄 Docker 快速部署
+| 功能           | 当前行为                                                                             |
+| -------------- | ------------------------------------------------------------------------------------ |
+| 顶部导航       | 我的简历 / 模板库 / 语法解析，使用一致的页面布局；旧 `/home` 链接兼容跳转            |
+| 简历管理       | 创建、继续编辑、复制、重命名、删除、搜索及排序；每份简历有独立 ID                    |
+| 独立排版       | 边距、字体、颜色和自定义 CSS 按简历保存，切换页面清理旧样式，避免不同简历串用        |
+| 模板管理       | 点击模板卡片编辑模板；支持新增、修改名称与内容、修改排版、显式保存、删除及未保存提醒 |
+| 从模板创建     | 点击“用此模板新建简历”复制当时的内容与排版，后续修改或删除模板不覆盖已有简历         |
+| 模板删除       | 内置和自定义模板均可删除；删除状态持久保存，刷新或旧离线缓存不会使模板重新出现       |
+| 本地 PDF 服务  | `pdf-service/` 使用 Chromium 生成 PDF / PNG，不需要第三方付费导出服务                |
+| 页面尺寸       | A4、A4 横向、Letter 及自定义页宽 / 页高（毫米，50–2000 mm）                          |
+| 自动延长纸张   | 保持页宽和字号，按内容增加页高，让稍超一页的内容完整呈现在单页                       |
+| 导出样式一致性 | 直接导出和浏览器打印共用内容与 CSS 快照，嵌入已加载字体和头像，等待资源完成后生成    |
+| 错误与隐私处理 | 资源加载失败时提示原因；个人草稿、模板覆盖数据、私有素材和生成文件默认不进入 Git     |
 
-你可以直接使用我已经构建好的镜像来运行
+## 环境要求
+
+- Node.js **22.12 或更新版本**，npm。
+- 直接导出 PDF 还需要已安装的 Google Chrome、Microsoft Edge 或 Chromium。
+- PDF 服务优先自动寻找 macOS Chrome / Edge 和常见 Linux Chromium 路径；其他路径使用 `CHROME_PATH`。
+- Linux 导出中文时，建议安装 Noto CJK 等中文字体。浏览器字体与图标 CDN 需要能正常访问；若需完全离线，可自行托管相关资源。
+
+## 本地启动
 
 ```sh
-docker run -d -t -p 8080:80 --name codecv --restart=always docker.io/wenyang0/codecv:latest
+git clone https://github.com/minteen/codecv.git
+cd codecv
+npm ci
+npm run pdf:install
 ```
 
-或者，如果您愿意，也可以自己手动编译。
+分别在两个终端启动：
 
 ```sh
-#下载代码
-git clone https://github.com/acmenlei/codecv.git
-
-#docker 编译
-cd codecv/
-docker build -t codecv:v1 .
-
-#启动服务
-docker run -d -t -p 8080:80 --name codecv --restart=always codecv:v1
+# 终端一：前端和本地草稿 / 模板接口
+npm run dev
 ```
 
-最后,打开你的浏览器访问服务的地址 http://serverIP:8080 即可（模板请自行编写与设计）
-
-
-
-## 😄 在本地安装调试
-
-```shell
-# 安装yarn包(有一个包需要使用yarn命令才能安装)
-npm i -g yarn
-
-#安装包
-yarn install
-
-#执行yarn install如果报错： yarn:无法加载文件 C\Users\talen\...\yarn.ps1
-#	打开Power Shell
-# 执行 set-ExecutionPolicy RemoteSigned 
-set-ExecutionPolicy RemoteSigned 	
-#选择 A或者Y 解除脚本不信任 重新执行 yarn install
-
-#启动项目
-npm run dev  或 yarn run dev
+```sh
+# 终端二：PDF 服务
+npm run pdf:start
 ```
 
-## 🤩 效果预览
+默认访问 [我的简历](http://127.0.0.1:5173/#/)。前端默认监听 `127.0.0.1`；若端口已占用，Vite 会在终端显示实际端口。
 
-<p>简历模板</p>
+PDF 服务默认监听 `http://127.0.0.1:3001`。开发环境已将 `/api/export` 代理到该服务，无需设置外部接口地址。服务运行期间请保留对应终端，停止时按 `Ctrl+C`。
 
-<img style="max-width: 1000px" src="./docs/templates.webp" alt="模板" />
+不启动 PDF 服务也能编辑简历；“备用导出”使用浏览器打印，可选择“另存为 PDF”。
 
-<p>简历编辑和暗黑主题</p>
+## 使用流程
 
-<img style="max-width: 1000px" src="./docs/editor.webp" alt="编辑页" />
+### 我的简历
 
-<p>内置多种矢量图标</p>
+1. 点击“新建简历”进入模板库。
+2. 点击模板卡片下方的“用此模板新建简历”，创建独立草稿并进入编辑器。
+3. 编辑内容与排版，草稿会自动保存。
+4. 返回“我的简历”，可以复制、重命名、删除、搜索及排序。
 
-<img style="max-width: 1000px" src="./docs/iconfont.webp" alt="矢量图标" />
+复制会继承当时的内容与排版，之后两份简历独立修改。重命名使用居中弹窗，空名称不能保存。
 
-## ✊🏻 待实现功能
+### 模板库
 
-[✓] 移动端适配
+- 点击卡片或“编辑模板”：修改模板，不创建简历。
+- 点击“添加模板”：输入名称后进入空白模板编辑。
+- 模板编辑器支持 Markdown、名称、字体、颜色、边距及自定义 CSS；完成后点击“保存模板”。
+- 未保存就离开或刷新时会提醒。
+- 点击“删除模板”并确认后，模板从库中移除，已有简历继续保留。
 
-[✓] 内容模式体验优化
+删除内置模板会保存删除标记，而不是物理删除其基础样式代码，从而保留已有简历的渲染能力。模板名称仍可作为既有简历的来源标签显示。
 
-[✓] 模板设计（持续更新... 欢迎为仓库贡献模板）
+### PDF 导出
 
-## 🤔 常见问题
+点击“导出 PDF”，选择预设尺寸或输入毫米数值。
 
-[语法问题请查看使用指南](https://codeleilei.gitee.io/markdown2pdf/#/syntax/helper)
+- **固定页高**：按指定尺寸分页。
+- **自动延长纸张**：勾选后按实际内容增加页高，页宽与字号不变；短内容仍保持设定页高，最长 2000 mm。
+- 加长纸张适合电子投递，打印到标准 A4 时需要缩放。
+- 与直接导出对比时，浏览器打印请选择相同纸张、无边距、100% 缩放，启用背景图形并关闭页眉页脚。
 
-**Q**: 为什么导出 `PDF` 后乱码？
+服务配置、接口格式与测试说明见 [pdf-service/README.md](./pdf-service/README.md)。
 
-**A**: 可能是缓存了旧的字体，请点击预览顶部工具栏中的重置简历内容进行重置，当然重置前请保证内容你已经保存
+## 数据保存和隐私
 
-**Q**: 为什么导出失败？
+| 数据                      | `npm run dev` 下的保存位置                                       | 纯静态部署                            |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------- |
+| 简历内容和排版            | `drafts/<id>.json`，接口不可用时回退到浏览器本地存储             | 浏览器本地存储                        |
+| 新增 / 修改模板、删除标记 | `template-library/<type>.json`，接口不可用时回退到浏览器本地存储 | 浏览器本地存储                        |
+| 内置虚构模板              | `src/templates/modules/`                                         | 随构建产物提供                        |
+| PDF / PNG                 | 下载到浏览器选择的位置；服务不保存输出文件                       | 需另行运行 PDF 服务，或使用浏览器打印 |
 
-**A**: 目前服务部署在 `netlify serverless` 服务上，因为是国外服务器，访问容易出错，请多尝试几遍，当然你也可以使用本地导出 `PDF` 替换
+- `drafts/`、`template-library/`、`local-private/`、`tmp/`、`output/`、`dist/` 和私有头像已在 `.gitignore` 排除。
+- 切勿将真实简历、身份证照片、聊天资料、收款码、访问令牌或包含这些内容的截图加入公开提交。
+- 默认简历只在浏览器、本机文件接口和本机 PDF 服务之间传递。页面仍会请求 Google Fonts 和图标 CDN；本 fork 已移除旧统计、社区登录和第三方上传请求。
+- 浏览器本地存储按“协议 + 主机 + 端口”隔离。`localhost`、`127.0.0.1` 和不同端口的数据并不共享。清理浏览器数据会删除仅保存在浏览器中的内容；重要简历请导出 Markdown 或备份本地数据目录。
+- `.gitignore` 不会清除已经提交的文件及 Git 历史；发布前仍需检查实际暂存区。
 
-## 🙏 赞助
+## 可选配置
 
-如果你觉得这个项目对你有帮助，并且情况允许的话，可以给我一点点支持，总之非常感谢支持～
+复制示例配置后再按需填写，通常无需修改：
 
-<div style="display: flex; gap: 20px;">
-	<div style="text-align: center">
-		<p>WeChat</p>
-		<img style="width: 165px" src="./docs/wechat.jpg" alt="微信" />
-	</div>
-	<div style="text-align: center">
-		<p>Alipay</p>
-		<img style="width: 150px" src="./docs/alipay.jpg" alt="支付宝" />
-	</div>
-</div>
+```sh
+cp .env.example .env.local
+```
 
-## License
+`VITE_EXPORT_URL` 是可选的导出接口地址。所有 `VITE_*` 变量都会暴露给前端，不能存放密钥或访问令牌。使用自定义服务地址意味着简历会发送到该服务，请只配置自己信任的目标。
 
-MIT © [Coderlei](./license)
+在 `pdf-service/` 目录内可指定浏览器或端口：
+
+```sh
+CHROME_PATH=/usr/bin/chromium PORT=3001 npm start
+```
+
+更改服务端口后，也要更新 `vite.config.ts` 的代理目标。额外远程图片 / 字体来源通过 PDF 服务的 `ASSET_ORIGINS` 配置；跨域头像需允许浏览器 CORS 读取。
+
+## 检查、测试与构建
+
+```sh
+npm run check       # TypeScript + ESLint
+npm test            # 草稿隔离、模板持久化 / 删除 / 离线恢复等回归测试
+npm run pdf:test    # 需要本机 Chromium：PDF / PNG、尺寸、自动加长、缺失资源处理
+npm run build      # 输出 dist/
+npm run preview    # 预览静态构建，不提供本地文件 API 或 PDF 代理
+```
+
+`npm test` 仅运行测试，不提交或推送 Git。PDF 测试产物写入被忽略的 `tmp/pdfs/`。项目以 npm 锁文件为准，前端和 `pdf-service/` 分别维护自己的 `package-lock.json`。
+
+## 部署边界
+
+静态站点可构建后部署：
+
+```sh
+npm run build
+docker build -t codecv-local .
+docker run --rm -p 8080:80 codecv-local
+```
+
+根目录 `Dockerfile` **只提供静态前端**，不包含 PDF 服务或文件持久化接口。
+
+- 草稿 / 模板文件接口由 Vite 开发插件提供，不会进入 `dist/`。静态部署回退到浏览器存储。
+- 生产环境要使用直接导出，需要单独运行 `pdf-service/`，并把同源 `/api/export` 转发到 `127.0.0.1:3001/api/export`，转发时移除 `Origin` 头。
+- PDF 服务和开发文件接口按可信本机使用设计。公网部署前应增加身份认证、限流、资源来源限制及进程隔离；不要直接暴露开发服务。
+- 本 fork 保留上游技术栈，依赖升级应单独验证；可使用 `npm audit` 和 `npm --prefix pdf-service audit` 检查依赖状态。
+- 本次准备已执行非强制依赖修复；前端审计仍有 **7 项告警（1 高、6 中）**，主要关联旧版 Vite / 类型检查工具链，需要后续大版本升级。当前类型检查、回归测试和构建通过不等于这些告警已消除。
+
+## 常见问题
+
+**页面打不开**：先确认前端终端仍在运行，并使用终端输出的地址。默认首页为 `/#/`，`/#/home` 会兼容跳转；开发配置固定监听 `127.0.0.1`。
+
+**`EADDRINUSE` / 3001 端口被占用**：通常已有 PDF 服务在运行，不要重复启动。可用 `lsof -nP -iTCP:3001 -sTCP:LISTEN` 检查；在原终端按 `Ctrl+C` 停止后再启动。
+
+**PDF 导出失败**：确认 PDF 服务已启动、浏览器可执行文件存在、字体和头像可读取。也可先使用“备用导出”。
+
+**换端口后简历不见了**：不同端口的浏览器存储独立；开发文件模式则需确认启动目录相同，且 `drafts/` 数据仍在。不要通过“重置内容”尝试恢复丢失数据。
+
+## 来源与许可
+
+原作：coderlei，源仓库：[acmenlei/codecv](https://github.com/acmenlei/codecv)。本 fork：[minteen/codecv](https://github.com/minteen/codecv)。
+
+保留上游 [LICENSE](./LICENSE) 原文及必要署名。其标题包含 GPLv3，但正文还包含非商业用途和署名条款；旧 README 的 MIT 表述与该文件不一致，因此这里不再将本项目标为 MIT，也未重新授权。使用与分发请以随附许可证原文为准。

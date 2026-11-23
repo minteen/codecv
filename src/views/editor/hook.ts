@@ -1,14 +1,26 @@
-import { onActivated, onDeactivated, Ref, ref, watch } from 'vue'
+import {
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated,
+  Ref,
+  ref,
+  watch
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDebounceFn, useThrottleFn } from '@vueuse/core'
 
 import { getLocalStorage } from '@/common/localstorage'
 import { errorMessage, successMessage, warningMessage } from '@/common/message'
-import { download, downloadOfBuffer, importCSS, isDev, queryDOM, useLoading } from '@/utils'
-import { ensureEmptyPreWhiteSpace, splitPage } from './components/tabbar/hook'
+import { download, downloadOfBuffer, importCSS, queryDOM, useLoading } from '@/utils'
+import { splitPage } from './components/tabbar/hook'
 import useEditorStore from '@/store/modules/editor'
 import { convertDOM } from '@/utils/moduleCombine'
 import { resumeExport } from '@/api/modules/resume'
+import { prepareExport, type PdfPageSize } from '@/common/pdf'
+import { templates, resolveTemplateType } from '@/templates/config'
+import { appearanceKeys, scopedAppearanceCSS } from '@/common/appearance'
 import {
   CUSTOM_CSS_STYLE,
   CUSTOM_MARKDOWN_PRIMARY_COLOR,
@@ -33,25 +45,44 @@ export const get = getLocalStorage,
 export function useRenderHTML(resumeType: Ref<string>) {
   const renderDOM = ref<HTMLElement>(document.body)
   const editorStore = useEditorStore()
+  const session = editorStore.draftSession
+  const scope = editorStore.appearanceScope
+  const templateStyle = document.createElement('style')
+  templateStyle.dataset.resumeTemplate = scope
+  let disposed = false
+  let paginationTimer: ReturnType<typeof setTimeout>
 
-  onActivated(() => {
-    importCSS(resumeType.value)
+  onMounted(async () => {
+    const css = await importCSS(editorStore.styleTemplate || resumeType.value)
+    if (disposed || session !== editorStore.draftSession) return
+    // Template styles are owned by this preview rather than accumulating in head
+    // through Vite's cached side-effect CSS imports.
+    document.head.querySelectorAll<HTMLStyleElement>('style[data-vite-dev-id]').forEach(style => {
+      if (/\/templates\/modules\/.*\/style\.scss$/.test(style.dataset.viteDevId || ''))
+        style.remove()
+    })
+    templateStyle.textContent = scopedAppearanceCSS(css, scope)
+    const firstAppearance = Array.from(document.head.querySelectorAll('style')).find(style =>
+      appearanceKeys.some(key => style.hasAttribute(`${key}-${scope}`))
+    )
+    document.head.insertBefore(templateStyle, firstAppearance || null)
     renderDOM.value.innerHTML = convertDOM(editorStore.MDContent).innerHTML
-    setTimeout(() => splitPage(renderDOM.value), 100)
+    paginationTimer = setTimeout(() => {
+      if (!disposed) splitPage(renderDOM.value)
+    }, 100)
+  })
+  onBeforeUnmount(() => {
+    disposed = true
+    clearTimeout(paginationTimer)
+    templateStyle.remove()
   })
 
   watch(
     () => editorStore.MDContent,
     v => {
+      if (disposed || session !== editorStore.draftSession) return
       renderDOM.value.innerHTML = convertDOM(v).innerHTML
       useThrottleFn(() => splitPage(renderDOM.value), 50)()
-    }
-  )
-  // 刷新页面（这里是一个比较有问题的点）
-  watch(
-    () => resumeType.value,
-    () => {
-      location.reload()
     }
   )
   return {
@@ -61,13 +92,13 @@ export function useRenderHTML(resumeType: Ref<string>) {
 
 export function useResumeType() {
   const route = useRoute()
-  //初始化也需要填上值 否则后续更新不一致会导致刷新死循环
-  const resumeType = ref(route.query.type ? String(route.query.type) : '10front_end')
-  onActivated(() => {
-    resumeType.value = route.query.type ? String(route.query.type) : '10front_end'
-  })
+  const resumeType = computed(() =>
+    resolveTemplateType(String(route.query.type || templates.value[0]?.type || 'create'))
+  )
+  const draftId = computed(() => (route.query.draft ? String(route.query.draft) : undefined))
   return {
-    resumeType
+    resumeType,
+    draftId
   }
 }
 // 导出简历｜markdown内容
@@ -75,65 +106,55 @@ export function useDownLoad(type: Ref<string>) {
   const router = useRouter(),
     editorStore = useEditorStore(),
     { showLoading, closeLoading } = useLoading()
-  // 导出前处理PDF中的样式
-  const exportPreHandler = async () => {
-    const html = queryDOM('.jufe') as HTMLElement,
-      htmlStyles = getComputedStyle(html)
-    const resumeBgColor = `html,body { background: ${htmlStyles.getPropertyValue(
-      'background'
-    )}; font-size:${htmlStyles.getPropertyValue('font-size')}; }`
-    const resetStyle = ` * { margin: 0; padding: 0; box-sizing: border-box; }`
-    // 获取简历模板的样式
-    let style = '',
-      linkURL = 'none'
-    if (isDev()) {
-      // 生产环境使用动态导入 生产环境使用link的方式引入（解决生产default属性不暴露的问题）
-      style = await importCSS(type.value)
-    } else {
-      const linkStyle = document.querySelector('link[href*="/css/style"]') as HTMLLinkElement
-      linkURL = linkStyle?.href || 'none'
-    }
-    // 处理自定义生成的样式
-    for (const attr of styleAttrs) {
-      const styleContent = document.head.querySelector(`style[${attr}-${type.value}]`)?.textContent
-      if (!styleContent) continue
-      style += styleContent
-    }
-    style = resetStyle + resumeBgColor + style
-    return { style, link: linkURL, content: html }
-  }
   // 导出PDF & 图片
-  const downloadDynamic = async (isPDF: boolean, fileName?: string) => {
-    const { content: html, style, link } = await exportPreHandler()
-    const content = html.cloneNode(true) as HTMLElement
-    !isPDF && ensureEmptyPreWhiteSpace(content)
+  const downloadDynamic = async (isPDF: boolean, fileName?: string, pageSize?: PdfPageSize) => {
     showLoading('正在导出请耐心等待...')
     try {
+      const { content, style } = await prepareExport(queryDOM('.reference-dom') as HTMLElement)
       const pdfData = await resumeExport({
-        content: content.outerHTML,
+        content,
         style,
-        link,
+        link: 'none',
         name: type.value,
-        type: isPDF ? 0 : 1
+        type: isPDF ? 0 : 1,
+        width: pageSize?.width ?? 210,
+        height: pageSize?.height ?? 297,
+        autoHeight: pageSize?.autoHeight ?? false,
+        assetOrigin: window.location.origin
       })
-      const buffer = isPDF ? pdfData.pdf.data : pdfData.picture.data
       const _fileName = (fileName || document.title) + (isPDF ? '.pdf' : '.png')
-      const fileType = 'application/' + isPDF ? 'pdf' : 'png'
-      downloadOfBuffer(buffer, _fileName, fileType)
+      if (pdfData instanceof Blob) {
+        const url = URL.createObjectURL(pdfData)
+        download(url, _fileName)
+        URL.revokeObjectURL(url)
+      } else {
+        const buffer = isPDF ? pdfData.pdf.data : pdfData.picture.data
+        downloadOfBuffer(buffer, _fileName, isPDF ? 'application/pdf' : 'image/png')
+      }
       successMessage('导出成功～')
     } catch (e: any) {
       const errorMsg =
         e.message == 'Failed to fetch'
           ? '国内导出易出错 请重新尝试 有条件的打开梯子后重试或使用备用导出'
-          : '导出出错 请先尝试备用导出方案'
+          : e.message || '导出出错 请先尝试备用导出方案'
       errorMessage(errorMsg)
+    } finally {
+      closeLoading()
     }
-    closeLoading()
   }
 
-  const downloadNative = () => {
-    editorStore.setNativeContent((<HTMLElement>queryDOM('.jufe')).innerHTML)
-    router.push({ path: '/download', query: { type: type.value } })
+  const downloadNative = async () => {
+    showLoading('正在准备打印样式…')
+    try {
+      const snapshot = await prepareExport(queryDOM('.reference-dom') as HTMLElement)
+      editorStore.setNativeContent(snapshot.content)
+      editorStore.nativeStyle = snapshot.style
+      await router.push({ path: '/download', query: { type: type.value } })
+    } catch (error: any) {
+      errorMessage(error.message || '无法准备导出样式，请重试')
+    } finally {
+      closeLoading()
+    }
   }
 
   const downloadMD = () => {
@@ -150,18 +171,18 @@ export function useDownLoad(type: Ref<string>) {
   }
 }
 
-export function useImportMD(resumeType: string) {
+export function useImportMD(resumeType: Ref<string>) {
   function importMD(file: File) {
     const { writable } = useEditorStore()
     if (writable) {
       return warningMessage('请先切换到Markdown模式')
     }
     const reader = new FileReader(),
-      { setMDContent } = useEditorStore()
+      { setMDContent, draftSession } = useEditorStore()
     reader.readAsText(file, 'utf-8')
     reader.onload = function (event) {
       successMessage('导入成功~')
-      setMDContent((event.target?.result as string) || '', resumeType)
+      setMDContent((event.target?.result as string) || '', resumeType.value, draftSession)
     }
     reader.onerror = function () {
       errorMessage('导入失败!')
@@ -172,7 +193,7 @@ export function useImportMD(resumeType: string) {
   }
 }
 
-export function useAvatar(resumeType: string) {
+export function useAvatar(resumeType: Ref<string>) {
   const matchAvatarSlot = /!\[个人头像\]\(.*\)/
   function setAvatar(path: string) {
     const { MDContent, setMDContent } = useEditorStore()
@@ -181,7 +202,7 @@ export function useAvatar(resumeType: string) {
       return
     }
     const newContent = MDContent.replace(matchAvatarSlot, `![个人头像](${path})`)
-    setMDContent(newContent, resumeType)
+    setMDContent(newContent, resumeType.value)
     successMessage('头像上传成功，如果你想修改为网络图片，你可直接修改对应的链接！')
     // 可能还需要处理可编辑模式中的头像
     const writableDOM = document.querySelector('.writable-edit-mode')

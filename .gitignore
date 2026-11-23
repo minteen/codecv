@@ -1,6 +1,29 @@
+# Dependencies and generated output
+node_modules/
+dist/
+dist-ssr/
+output/
 stats.html
+coverage/
+*.tsbuildinfo
+
+# Local resume data and private media (never publish)
+drafts/
+template-library/
+local-private/
+tmp/
+src/assets/svg/identify.svg
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -8,19 +31,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist-ssr
-*.local
-
-# Editor directories and files
+# Editor / OS
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.env
-src/templates/modules/[0-9]*

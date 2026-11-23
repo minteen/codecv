@@ -1,156 +1,307 @@
 <script setup lang="ts">
-import NavBar from '@/components/navBar.vue'
-import resumeCard from './components/resumeCard.vue'
-import Empty from '@/components/empty.vue'
+import { computed, ref, onActivated } from 'vue'
+import {
+  templates,
+  type TemplateType,
+  addLibraryTemplate,
+  removeLibraryTemplate,
+  loadTemplateLibrary
+} from '@/templates/config'
+import ResumeCard from './components/resumeCard.vue'
 import { templateCategory } from './constant'
-import { useCategory, useTemplateData, useNotification } from './hook'
-import { numFormat } from '@/utils/format'
-import ToastModal from '@/components/toast-modal/toastModal.vue'
+import { useRouter } from 'vue-router'
+import { createDraft } from '@/common/drafts'
+import { errorMessage, successMessage } from '@/common/message'
+import { ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message-box/style/css'
 
-const { queryCategory, data } = useCategory()
-const { ranks } = useTemplateData()
-const { flag, close } = useNotification()
+const router = useRouter()
+const busy = ref(false)
+async function startDraft(template?: TemplateType) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    const type = template?.type || 'create'
+    const draft = await createDraft(type, template?.name || '空白简历', template?.content || '', {
+      appearance: template?.appearance,
+      baseTemplate: template?.baseTemplate || type
+    })
+    await router.push({ path: '/editor', query: { type, draft: draft.id } })
+  } catch {
+    errorMessage('创建简历失败，请重试')
+  } finally {
+    busy.value = false
+  }
+}
+function editTemplate(template: TemplateType) {
+  router.push({ path: '/editor', query: { type: template.type, mode: 'template' } })
+}
+async function removeTemplate(template: TemplateType) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    await ElMessageBox.confirm(
+      `确定删除模板“${template.name}”吗？删除后将无法再使用这个模板创建简历，已有简历不受影响。`,
+      '删除模板',
+      { type: 'warning', confirmButtonText: '删除模板', cancelButtonText: '取消' }
+    )
+    await removeLibraryTemplate(template.type)
+    if (!categories.value.includes(category.value)) category.value = '全部'
+    successMessage('模板已删除')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') errorMessage('删除模板失败，请重试')
+  } finally {
+    busy.value = false
+  }
+}
+async function addTemplate() {
+  if (busy.value) return
+  busy.value = true
+  try {
+    const { value } = await ElMessageBox.prompt('给新模板起一个容易辨认的名字', '添加模板', {
+      inputPlaceholder: '例如：后端开发简约模板',
+      inputPattern: /\S+/,
+      inputErrorMessage: '模板名称不能为空',
+      confirmButtonText: '创建并编辑',
+      cancelButtonText: '取消'
+    })
+    const template = await addLibraryTemplate(value)
+    await router.push({ path: '/editor', query: { type: template.type, mode: 'template' } })
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') errorMessage('添加模板失败，请重试')
+  } finally {
+    busy.value = false
+  }
+}
+onActivated(() => {
+  void loadTemplateLibrary().catch(() => errorMessage('模板加载失败，请重试'))
+})
+const search = ref('')
+const category = ref('全部')
+function clearFilters() {
+  search.value = ''
+  category.value = '全部'
+}
+const categories = computed(() =>
+  templateCategory.filter(
+    item => item === '全部' || templates.value.some(template => template.name.includes(item))
+  )
+)
+const visibleTemplates = computed(() =>
+  templates.value.filter(
+    template =>
+      (category.value === '全部' || template.name.includes(category.value)) &&
+      template.name.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())
+  )
+)
 </script>
 
 <template>
-  <div class="resume-container flex">
-    <div class="resume-left-container content-card" data-aos="fade-right">
-      <NavBar button="创作模板" :tabs="templateCategory" @tab-click="queryCategory" />
-      <div class="resume-card-container" v-if="data.length">
-        <resume-card v-for="theme in data" :key="theme.id" :theme="theme" />
+  <main class="template-picker noto-sans-sc" aria-labelledby="template-title" :aria-busy="busy">
+    <div class="picker-intro">
+      <div>
+        <p class="picker-eyebrow">把好的排版，留作下一次的起点</p>
+        <h1 id="template-title">模板库</h1>
+        <p>点击模板修改内容与样式，或添加自己的模板。</p>
       </div>
-      <Empty v-else title="暂时没有这类模板 你可以点击右上角创作模板或联系作者添加～" />
+      <button class="blank-start" :disabled="busy" @click="addTemplate">
+        <span aria-hidden="true">＋</span> 添加模板
+      </button>
     </div>
-    <div class="resume-right-container" data-aos="fade-left">
-      <div class="resume-hot-rank content-card mb-20">
-        <strong class="mb-20">简历模板热度排行</strong>
-        <ul v-if="ranks.length">
-          <li
-            v-for="(t, idx) in ranks"
-            :key="t.type"
-            class="flex hover pointer"
-            @click="$router.push({ path: `/editor`, query: { type: t.type } })"
-          >
-            <el-tooltip :content="t.name" placement="left">
-              <p class="line-1">
-                <span class="mr-10">{{ idx + 1 }}</span
-                >{{ t.name }}
-              </p>
-            </el-tooltip>
-            <sub> <i class="iconfont icon-hot"></i> {{ numFormat(+String(t.hot)) }}</sub>
-          </li>
-        </ul>
-        <Empty title="正在加载中" v-else />
+    <div class="picker-tools">
+      <div class="category-filters" role="group" aria-label="模板分类">
+        <button
+          v-for="item in categories"
+          :key="item"
+          :aria-pressed="category === item"
+          @click="category = item"
+        >
+          {{ item }}
+        </button>
       </div>
-      <div class="resume-notification content-card">
-        <strong>公告</strong>
-        <p>
-          如果你觉得项目对你有所帮助，请考虑为
-          <a href="https://github.com/acmenlei/codecv" target="_blank">项目</a>
-          点一个 <i class="iconfont icon-star"></i>，若遇到 BUG 请通过底部微信/
-          <a href="https://github.com/acmenlei/codecv/issues" target="_blank">issues</a>
-          描述并复现你所遇到的问题，良好的用户体验需要大家一起来构建，感谢大家的支持～🙏
-        </p>
-      </div>
+      <input v-model="search" type="search" placeholder="搜索模板名称" aria-label="搜索模板" />
     </div>
-  </div>
-  <ToastModal :flag="flag" @close="close">
-    <h3 style="margin-bottom: 10px">通知</h3>
-    <p style="line-height: 27px">
-      近期反应同学较多，发个通知告知一下，此网址为备用网址，若需体验更多功能请前往主站<a
-        target="_blank"
-        href="https://codecv.top"
-        style="color: var(--theme); text-decoration: none"
-      >
-        https://codecv.top</a
-      >
+    <p class="template-count" role="status">
+      {{ visibleTemplates.length }} 个模板<span> · 修改模板不会影响已有简历</span>
     </p>
-    <ol class="" style="margin: 10px 0; padding-left: 20px; line-height: 28px">
-      <li>🌈 主站导出文件更稳定</li>
-      <li>✍🏻 编写体验更好</li>
-      <li>✨ 工具更加完善</li>
-      <li>☁️ 数据云端实时保存</li>
-    </ol>
-    <p>若不需要请直接忽略，谢谢配合!</p>
-    <br />
-    <div class="flex group">
-      <img src="@/assets/img/wechat_group.png" style="width: 30%" />
-      <h4>加入群聊获取最新情报，兄弟萌速速来水群 ✌🏻</h4>
+    <div v-if="visibleTemplates.length" class="template-grid">
+      <ResumeCard
+        v-for="template in visibleTemplates"
+        :key="template.type"
+        :theme="template"
+        :disabled="busy"
+        @edit="editTemplate"
+        @create="startDraft"
+        @delete="removeTemplate"
+      />
     </div>
-    <p style="text-align: center; margin-top: 20px">
-      <button class="primary btn" @click="close">知道了</button>
-    </p>
-  </ToastModal>
+    <div v-else class="no-templates">
+      <h3>{{ templates.length ? '没有找到匹配的模板' : '还没有模板' }}</h3>
+      <p>
+        {{
+          templates.length
+            ? '试试其他名称，或添加一个新模板。'
+            : '添加一个模板，保存你自己的内容与排版。'
+        }}
+      </p>
+      <button v-if="templates.length" @click="clearFilters">清除筛选</button>
+      <button v-else :disabled="busy" @click="addTemplate">添加模板</button>
+    </div>
+    <p v-if="busy" class="template-count" role="status">正在处理，请稍候…</p>
+  </main>
 </template>
 
 <style lang="scss" scoped>
-.resume-container {
-  max-width: var(--max-width);
-  margin: 20px auto;
-
-  .resume-notification {
-    padding-bottom: 140px;
-    position: sticky;
-    top: 80px;
-    font-size: 15px;
-    line-height: 28px;
-    strong {
-      display: inline-block;
-      margin-bottom: 10px;
-      padding-bottom: 5px;
-      color: var(--theme);
-    }
-    a {
-      color: #5e75eb;
-    }
-  }
-
-  .resume-hot-rank {
-    strong {
-      display: inline-block;
-      color: var(--theme);
-    }
-    li {
-      font-size: 14px;
-      line-height: 30px;
-      p {
-        max-width: 135px;
-      }
-      sub {
-        font-weight: 500;
-        white-space: nowrap;
-        color: orangered;
-        text-align: right;
-        flex-grow: 1;
-      }
-      &:nth-child(1),
-      &:nth-child(2),
-      &:nth-child(3) {
-        p span {
-          color: orangered;
-        }
-      }
-    }
-  }
-
-  .resume-left-container {
-    margin-right: 20px;
-    .resume-card-container {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-    }
-  }
+.template-picker {
+  color: var(--font-color);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 32px;
 }
-.group {
+.picker-intro {
+  display: flex;
   align-items: center;
-  gap: 40px;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  h1 {
+    font-size: 34px;
+    letter-spacing: -0.5px;
+    margin: 8px 0 10px;
+  }
+  p {
+    font-size: 13px;
+    color: var(--writable-font-color);
+    line-height: 1.7;
+  }
+  .picker-eyebrow {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
 }
-@media screen and (max-width: 800px) {
-  .resume-right-container {
+.blank-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 11px 16px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--font-color);
+  cursor: pointer;
+}
+.picker-tools {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  input {
+    width: 210px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--el-border-color);
+    border-radius: 7px;
+    background: var(--background);
+    color: var(--font-color);
+  }
+}
+.category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  button {
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--writable-font-color);
+    background: transparent;
+    cursor: pointer;
+  }
+  [aria-pressed='true'] {
+    background: var(--theme);
+    color: white;
+  }
+}
+.template-count {
+  margin: 18px 0;
+  font-size: 12px;
+  color: var(--writable-font-color);
+}
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.no-templates {
+  text-align: center;
+  padding: 48px 20px;
+  h3 {
+    margin-bottom: 12px;
+  }
+  p {
+    margin-bottom: 20px;
+  }
+  button {
+    padding: 10px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--el-border-color);
+    background: var(--background);
+    color: var(--theme);
+    cursor: pointer;
+  }
+}
+button,
+input {
+  font: inherit;
+  &:focus-visible {
+    outline: 2px solid var(--theme);
+    outline-offset: 3px;
+  }
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+@media (max-width: 900px) {
+  .template-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .template-picker {
+    padding: 28px 20px;
+  }
+  .picker-intro {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    h1 {
+      font-size: 28px;
+    }
+  }
+  .picker-tools {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    input {
+      width: 100%;
+    }
+  }
+  .template-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .template-count span {
     display: none;
   }
-  .resume-left-container {
-    margin-left: 20px;
+}
+@media (max-width: 380px) {
+  .template-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

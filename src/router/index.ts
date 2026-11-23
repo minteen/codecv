@@ -11,8 +11,8 @@ Object.keys(routeFiles).forEach(routeModule => {
 
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
-    redirect: '/home'
+    path: '/home',
+    redirect: to => ({ path: '/', query: to.query, hash: to.hash })
   },
   {
     path: '/download',
@@ -26,7 +26,14 @@ const routes: RouteRecordRaw[] = [
   }
 ]
 
-const topInitList = ['/community/detail', '/syntax/helper', '/update/line', '/home', '/editor']
+const topInitList = [
+  '/community/detail',
+  '/syntax/helper',
+  '/template',
+  '/update/line',
+  '/',
+  '/editor'
+]
 
 const router = createRouter({
   routes: routeConfiguras.concat(routes),
@@ -35,6 +42,11 @@ const router = createRouter({
     if (topInitList.includes(to.path)) return { top: 0 /*  behavior: 'smooth' */ }
     if (savePos) return savePos
   }
+})
+
+// Compatibility with links produced by the previous modal-based creation flow.
+router.beforeEach(to => {
+  if (to.path === '/' && to.query.create === '1') return { path: '/template', replace: true }
 })
 
 export default router

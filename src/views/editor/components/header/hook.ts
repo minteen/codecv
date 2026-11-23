@@ -1,4 +1,5 @@
-import { onActivated, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import useEditorStore from '@/store/modules/editor'
 
 export function useFile(emit: any) {
   const fileName = ref('')
@@ -11,7 +12,7 @@ export function useFile(emit: any) {
     emit('import-md', event?.target?.files[0])
   }
 
-  onActivated(() => (fileName.value = document.title))
+  onMounted(() => (fileName.value = useEditorStore().activeDraftName || document.title))
   return {
     fileName,
     exportFile,

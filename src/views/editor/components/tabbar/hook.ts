@@ -1,10 +1,8 @@
-import { getLocalStorage, removeLocalStorage, setLocalStorage } from '@/common/localstorage'
+import type { DraftAppearanceContext } from '@/common/draftAppearance'
 import { createStyle, query, removeHeadStyle, convert, createDIV } from '@/utils'
 import { getFontFamily, getPrimaryBGColor, getPrimaryColor } from '@/templates/config'
-import { onActivated, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, nextTick } from 'vue'
 
-const get = getLocalStorage,
-  set = setLocalStorage
 export const CUSTOM_CSS_STYLE = 'custom-css-style',
   CUSTOM_MARKDOWN_PRIMARY_COLOR = 'custom-markdown-primary-color',
   CUSTOM_MARKDOWN_PRIMARY_BG_COLOR = 'custom_markdown_primary_bg_color',
@@ -43,16 +41,17 @@ export function useAvatar(emits: any) {
   }
 }
 
-export function useCustomCSS(resumeType: string) {
+export function useCustomCSS(resumeType: string, appearance: DraftAppearanceContext) {
   const cssDialog = ref(false),
-    cacheKey = CUSTOM_CSS_STYLE + '-' + resumeType
-  const cssText = ref(get(cacheKey) ? (get(cacheKey) as string) : '')
+    cacheKey = appearance.key(CUSTOM_CSS_STYLE)
+  const cssText = ref(appearance.get(cacheKey) ? (appearance.get(cacheKey) as string) : '')
 
   function toggleDialog() {
     cssDialog.value = !cssDialog.value
   }
 
   function setStyle() {
+    if (!appearance.active()) return
     cssDialog.value = false
     let style = query(cacheKey)
 
@@ -65,19 +64,23 @@ export function useCustomCSS(resumeType: string) {
       style = createStyle()
       style.setAttribute(cacheKey, 'true')
     }
-    style.textContent = cssValue
+    style.textContent = appearance.wrap(cssValue)
     !isAppend && document.head?.appendChild(style)
-    set(cacheKey, cssValue)
+    appearance.set(cacheKey, cssValue)
   }
 
   function removeStyle() {
+    if (!appearance.active()) return
     cssDialog.value = false
     removeHeadStyle(cacheKey)
-    removeLocalStorage(cacheKey)
+    appearance.remove(cacheKey)
     cssText.value = ''
   }
 
-  onActivated(() => !query(cacheKey) && setTimeout(setStyle, 50))
+  onMounted(async () => {
+    await nextTick()
+    if (appearance.active()) setStyle()
+  })
 
   return {
     cssDialog,
@@ -88,12 +91,15 @@ export function useCustomCSS(resumeType: string) {
   }
 }
 
-export function usePrimaryBGColor(resumeType: string) {
-  const cacheKey = CUSTOM_MARKDOWN_PRIMARY_BG_COLOR + '-' + resumeType,
+export function usePrimaryBGColor(resumeType: string, appearance: DraftAppearanceContext) {
+  const cacheKey = appearance.key(CUSTOM_MARKDOWN_PRIMARY_BG_COLOR),
     initialColor = getPrimaryBGColor(resumeType)
-  const primaryColor = ref(get(cacheKey) ? (get(cacheKey) as string) : initialColor)
+  const primaryColor = ref(
+    appearance.get(cacheKey) ? (appearance.get(cacheKey) as string) : initialColor
+  )
 
   function setPrimaryColor(color: string | null) {
+    if (!appearance.active()) return
     if (!color) {
       primaryColor.value = initialColor
       color = initialColor
@@ -104,12 +110,12 @@ export function usePrimaryBGColor(resumeType: string) {
       style = createStyle()
       style.setAttribute(cacheKey, 'true')
     }
-    style.textContent = `:root { --markdown-primary-bg-color: ${color}; }`
+    style.textContent = appearance.wrap(`:root { --markdown-primary-bg-color: ${color}; }`)
     !append && document.head.appendChild(style)
-    set(cacheKey, color)
+    appearance.set(cacheKey, color)
   }
 
-  onActivated(() => !query(cacheKey) && setPrimaryColor(primaryColor.value))
+  onMounted(() => !query(cacheKey) && setPrimaryColor(primaryColor.value))
 
   return {
     primaryColor,
@@ -118,12 +124,13 @@ export function usePrimaryBGColor(resumeType: string) {
 }
 
 // todo: 回跳后颜色显示的问题，后续考虑接入后端解决
-export function usePrimaryColor(resumeType: string) {
-  const cacheKey = CUSTOM_MARKDOWN_PRIMARY_COLOR + '-' + resumeType,
+export function usePrimaryColor(resumeType: string, appearance: DraftAppearanceContext) {
+  const cacheKey = appearance.key(CUSTOM_MARKDOWN_PRIMARY_COLOR),
     initialColor = getPrimaryColor(resumeType),
-    color = ref(get(cacheKey) ? (get(cacheKey) as string) : initialColor)
+    color = ref(appearance.get(cacheKey) ? (appearance.get(cacheKey) as string) : initialColor)
 
   function setColor(value: string | null) {
+    if (!appearance.active()) return
     if (!value) {
       color.value = initialColor
       value = initialColor
@@ -135,12 +142,12 @@ export function usePrimaryColor(resumeType: string) {
       styleDOM = createStyle()
       styleDOM.setAttribute(cacheKey, 'true')
     }
-    styleDOM.textContent = `:root { --markdown-primary-color: ${value} }`
+    styleDOM.textContent = appearance.wrap(`:root { --markdown-primary-color: ${value} }`)
     !isAppend && document.head.appendChild(styleDOM)
-    set(cacheKey, value)
+    appearance.set(cacheKey, value)
   }
 
-  onActivated(() => !query(cacheKey) && setColor(color.value))
+  onMounted(() => !query(cacheKey) && setColor(color.value))
 
   return {
     color,
@@ -149,8 +156,8 @@ export function usePrimaryColor(resumeType: string) {
 }
 
 // 自定义字体
-export function useCustomFont(resumeType: string) {
-  const cacheKey = MARKDOWN_FONT + '-' + resumeType
+export function useCustomFont(resumeType: string, appearance: DraftAppearanceContext) {
+  const cacheKey = appearance.key(MARKDOWN_FONT)
   const fontOptions = [
     {
       value: 'Noto Serif SC',
@@ -166,10 +173,14 @@ export function useCustomFont(resumeType: string) {
     }
   ]
   const font = ref(
-    get(cacheKey) ? (get(cacheKey) as string) : getFontFamily(resumeType) || fontOptions[0].value
+    appearance.get(cacheKey)
+      ? (appearance.get(cacheKey) as string)
+      : getFontFamily(resumeType) || fontOptions[0].value
   )
 
   function setFont(fontFamily: string | null, first?: boolean) {
+    if (!appearance.active()) return
+    fontFamily = fontFamily || getFontFamily(resumeType) || fontOptions[0].value
     let style = query(cacheKey)
     const isAppend = style
     if (!style) {
@@ -177,15 +188,17 @@ export function useCustomFont(resumeType: string) {
       style.setAttribute(cacheKey, 'true')
     }
 
-    style.textContent = `.jufe * { font-family: ${fontFamily}, 'Noto Sans SC', 'Noto Serif SC', 'Nunito', sans-serif, serif; }`
+    style.textContent = appearance.wrap(
+      `.jufe * { font-family: ${fontFamily}, 'Noto Sans SC', 'Noto Serif SC', 'Nunito', sans-serif, serif; }`
+    )
     !isAppend && document.head.appendChild(style)
-    set(cacheKey, fontFamily)
+    appearance.set(cacheKey, fontFamily)
     const renderCV = queryRenderCV()
     ensureEmptyPreWhiteSpace(renderCV)
     !first && splitPage(renderCV)
   }
 
-  onActivated(() => setFont(font.value, true))
+  onMounted(() => setFont(font.value, true))
 
   return {
     fontOptions,
@@ -194,24 +207,11 @@ export function useCustomFont(resumeType: string) {
   }
 }
 
-/* 一键重置 */
-export function restResumeContent(resumeType: string) {
-  localStorage.removeItem(`${CUSTOM_CSS_STYLE}-${resumeType}`)
-  localStorage.removeItem(`${CUSTOM_MARKDOWN_PRIMARY_COLOR}-${resumeType}`)
-  localStorage.removeItem(`${CUSTOM_MARKDOWN_PRIMARY_BG_COLOR}-${resumeType}`)
-  localStorage.removeItem(`${MARKDOWN_FONT}-${resumeType}`)
-  localStorage.removeItem(`${AUTO_ONE_PAGE}-${resumeType}`)
-  localStorage.removeItem(`${ADJUST_RESUME_MARGIN_TOP}-${resumeType}`)
-  localStorage.removeItem(`${LINE_HEIGHT}-${resumeType}`)
-  localStorage.removeItem(`markdown-content-${resumeType}`)
-  location.reload()
-}
-
 // 调节元素边距
-export function useAdjust(resumeType: string) {
+export function useAdjust(resumeType: string, appearance: DraftAppearanceContext) {
   const visible = ref(false)
   const properties = reactive<IElementProperty[]>([])
-  const cacheKey = ADJUST_RESUME_MARGIN_TOP + '-' + resumeType
+  const cacheKey = appearance.key(ADJUST_RESUME_MARGIN_TOP)
   interface IElementProperty {
     name: string
     marginTop: number
@@ -260,6 +260,7 @@ export function useAdjust(resumeType: string) {
   }
 
   function confirmAdjustment() {
+    if (!appearance.active()) return
     setVisible()
     let styleDOM = query(cacheKey),
       cssText = ''
@@ -273,9 +274,9 @@ export function useAdjust(resumeType: string) {
       const target = property.className ? `.${property.className}` : property.tagName
       cssText += `.jufe ${target} {margin-top: ${property.marginTop}px!important; margin-bottom: ${property.marginBottom}px!important;}`
     }
-    styleDOM.textContent = cssText
+    styleDOM.textContent = appearance.wrap(cssText)
     priorityInsert(isAppend, styleDOM)
-    set(cacheKey, cssText)
+    appearance.set(cacheKey, cssText)
     const renderCV = queryRenderCV()
     ensureEmptyPreWhiteSpace(renderCV)
     splitPage(renderCV)
@@ -284,8 +285,8 @@ export function useAdjust(resumeType: string) {
   function priorityInsert(isAppend: Element | null, styleDOM: Element) {
     if (!isAppend) {
       // 插入到自动一页css前面 因为调整的优先级是最低的
-      const autoOnePage = query(AUTO_ONE_PAGE + '-' + resumeType)
-      const customCSS = query(CUSTOM_CSS_STYLE + '-' + resumeType)
+      const autoOnePage = query(appearance.key(AUTO_ONE_PAGE))
+      const customCSS = query(appearance.key(CUSTOM_CSS_STYLE))
       if (autoOnePage || customCSS) {
         const siblingStyle = autoOnePage || customCSS
         document.head.insertBefore(styleDOM, siblingStyle)
@@ -301,7 +302,7 @@ export function useAdjust(resumeType: string) {
   }
   // 进入页面读取历史样式 并初始化CSS
   function initAdjustCSS() {
-    const adjustCSS = (get(cacheKey) as string) || ''
+    const adjustCSS = (appearance.get(cacheKey) as string) || ''
     if (!adjustCSS) return
     let styleDOM = query(cacheKey)
     const isAppend = styleDOM
@@ -309,11 +310,11 @@ export function useAdjust(resumeType: string) {
       styleDOM = createStyle()
       styleDOM.setAttribute(cacheKey, 'true')
     }
-    styleDOM.textContent = adjustCSS
+    styleDOM.textContent = appearance.wrap(adjustCSS)
     priorityInsert(isAppend, styleDOM)
   }
   // 如果页面中没有用户调整了的样式 那么就需要去初始化
-  onActivated(() => !query(cacheKey) && initAdjustCSS())
+  onMounted(() => !query(cacheKey) && initAdjustCSS())
   return { adjustMargin, visible, confirmAdjustment, properties }
 }
 
